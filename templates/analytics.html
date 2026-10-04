@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block content %}
+<main class="analytics-page" id="analyticsDashboard"
+      data-api-url="{{ url_for('analytics_data') }}"
+      data-default-start="{{ default_start_date }}" data-default-end="{{ default_end_date }}">
+    <section class="analytics-hero p-4 p-md-5 mb-4 rounded-4">
+        <div class="eyebrow">YOUR NETWORK, IN CONTEXT</div>
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+            <div>
+                <h1 class="display-6 fw-semibold mt-2 mb-2">Connectivity analytics</h1>
+                <p class="text-secondary mb-0">Explore your measurement trends, time patterns, and location performance.</p>
+            </div>
+            <span class="analytics-scope">Private to your account</span>
+        </div>
+    </section>
+
+    <section class="analytics-filter-panel mb-4" aria-label="Analytics filters">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div><h2 class="h5 mb-1">Filter results</h2><p class="small text-secondary mb-0">Filters apply to summaries and charts.</p></div>
+            <span id="analyticsStatus" class="small text-secondary" role="status" aria-live="polite">Loading your data…</span>
+        </div>
+        <form id="analyticsFilters" class="row g-3 align-items-end">
+            <div class="col-6 col-lg-2"><label for="filterStart" class="form-label">From</label><input id="filterStart" name="start_date" type="date" value="{{ default_start_date }}" class="form-control"></div>
+            <div class="col-6 col-lg-2"><label for="filterEnd" class="form-label">To</label><input id="filterEnd" name="end_date" type="date" value="{{ default_end_date }}" class="form-control"></div>
+            <div class="col-md-5 col-lg-4"><label for="filterLocation" class="form-label">Location</label>
+                <select id="filterLocation" name="location" class="form-select"><option value="">All recorded locations</option>
+                    {% for location in locations %}<option value="{{ location.value }}">{{ location.label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 col-lg-2"><label for="filterClassification" class="form-label">Classification</label>
+                <select id="filterClassification" name="classification" class="form-select">
+                    <option value="">All classifications</option><option>Excellent</option><option>Good</option><option>Weak</option><option>Dead Zone</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-2 d-flex gap-2"><button class="btn btn-primary flex-grow-1" type="submit">Apply</button><button class="btn btn-outline-secondary" type="reset" id="resetAnalytics">Reset</button></div>
+        </form>
+    </section>
+
+    <div id="analyticsError" class="alert alert-danger d-none" role="alert"></div>
+    <section class="row g-3 mb-4" aria-label="Key statistics">
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Total measurements</span><strong id="statTotal">—</strong><small>In selected range</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Average download</span><strong id="statDownload">—</strong><small>Mbps</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Average upload</span><strong id="statUpload">—</strong><small>Mbps</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Average latency</span><strong id="statLatency">—</strong><small>Milliseconds</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Connectivity score</span><strong id="statScore">—</strong><small>Average score out of 100</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Good locations</span><strong id="statGood">—</strong><small>Distinct coordinates</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Weak locations</span><strong id="statWeak">—</strong><small>Distinct coordinates</small></article></div>
+        <div class="col-6 col-xl-3"><article class="analytics-stat"><span>Dead-zone measurements</span><strong id="statDead">—</strong><small>Classified tests</small></article></div>
+    </section>
+
+    <section class="row g-3 mb-4">
+        <div class="col-md-6"><article class="analytics-place best"><span>Best performing location</span><strong id="bestLocation">No location data</strong><small id="bestLocationDetail">Requires saved coordinates and score.</small></article></div>
+        <div class="col-md-6"><article class="analytics-place worst"><span>Lowest performing location</span><strong id="worstLocation">No location data</strong><small id="worstLocationDetail">Requires saved coordinates and score.</small></article></div>
+    </section>
+
+    <section class="row g-3 mb-4">
+        <div class="col-xl-8"><article class="analytics-chart-card"><div class="chart-heading"><div><h2>Connectivity trend</h2><p>Daily average score, download, and upload</p></div></div><div class="chart-wrap"><canvas id="trendChart" aria-label="Connectivity trend line chart"></canvas></div></article></div>
+        <div class="col-xl-4"><article class="analytics-chart-card"><div class="chart-heading"><div><h2>Classification mix</h2><p>Measurements by connectivity class</p></div></div><div class="chart-wrap"><canvas id="classificationChart" aria-label="Classification doughnut chart"></canvas></div></article></div>
+        <div class="col-lg-6"><article class="analytics-chart-card"><div class="chart-heading"><div><h2>By time of day</h2><p>Average connectivity score by local server time</p></div></div><div class="chart-wrap chart-wrap-short"><canvas id="timeChart" aria-label="Connectivity by time of day bar chart"></canvas></div></article></div>
+        <div class="col-lg-6"><article class="analytics-chart-card"><div class="chart-heading"><div><h2>By day of week</h2><p>Average connectivity score for each day</p></div></div><div class="chart-wrap chart-wrap-short"><canvas id="weekdayChart" aria-label="Connectivity by weekday bar chart"></canvas></div></article></div>
+        <div class="col-xl-7"><article class="analytics-chart-card"><div class="chart-heading"><div><h2>Location comparison</h2><p>Top locations by average connectivity score</p></div></div><div class="chart-wrap chart-wrap-location"><canvas id="locationChart" aria-label="Location comparison chart"></canvas></div></article></div>
+        <div class="col-xl-5"><article class="analytics-chart-card"><div class="chart-heading"><div><h2>Historical comparison</h2><p id="comparisonCaption">Selected period vs previous period</p></div></div><div class="chart-wrap chart-wrap-location"><canvas id="comparisonChart" aria-label="Historical comparison bar chart"></canvas></div><p id="comparisonNote" class="small text-secondary mb-0 mt-2">Date ranges are equal in length.</p></article></div>
+    </section>
+    <p class="analytics-footnote">Charts use saved measurements only. Locations without browser-permitted coordinates are excluded from location comparisons. Time of day uses the application server’s stored timestamp.</p>
+</main>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/analytics.js', v='phase6') }}"></script>{% endblock %}

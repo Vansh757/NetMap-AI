@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block content %}
+<header class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
+    <div><div class="eyebrow">EXPLAINABLE CONNECTIVITY INSIGHTS</div><h1 class="display-6 fw-semibold mb-1">Recommendation history</h1><p class="text-secondary mb-0">Active and resolved recommendations generated from your recent measurements.</p></div>
+    <a class="btn btn-outline-primary" href="{{ url_for('dashboard') }}">Back to dashboard</a>
+</header>
+{% if recommendations %}
+<div class="recommendation-list">
+    {% for item in recommendations %}
+    <article class="recommendation-card severity-{{ item.severity|lower }} {% if item.status == 'resolved' %}recommendation-resolved{% endif %}">
+        <div class="recommendation-card-heading"><span class="recommendation-severity">{{ item.severity }}</span><span class="recommendation-status {{ item.status }}">{{ item.status|title }}</span><small>First seen {{ item.first_seen }} · Last seen {{ item.last_seen }}{% if item.resolved_at %} · Resolved {{ item.resolved_at }}{% endif %}</small></div>
+        <h2 class="h5">{{ item.title }}</h2><p class="recommendation-problem">{{ item.problem }}</p>
+        <p class="recommendation-action"><strong>Suggested action:</strong> {{ item.recommendation }}</p>
+        <p class="recommendation-reason"><strong>Reason:</strong> {{ item.reason }}</p>
+        <div class="recommendation-evidence"><strong>Supporting measurements:</strong>
+            {% for measurement in item.supporting_measurements %}<a href="{{ measurement.url }}">#{{ measurement.id }}</a>{% else %}<span>None stored</span>{% endfor %}
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h2 class="h5">No recommendations yet</h2><p class="text-secondary">As you collect measurements, this page will show explainable patterns supported by your data.</p><a class="btn btn-primary" href="{{ url_for('connectivity_test') }}">Run Internet Test</a></div>
+{% endif %}
+<p class="analytics-footnote mt-4">Recommendations identify patterns and unusual changes. They do not determine the physical cause of a connectivity issue.</p>
+{% endblock %}

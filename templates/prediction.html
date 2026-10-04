@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block content %}
+<main class="prediction-page" id="predictionDashboard"
+      data-api-url="{{ url_for('predict_connectivity') }}" data-model-ready="{{ 'true' if model_ready else 'false' }}">
+    <section class="analytics-hero p-4 p-md-5 mb-4 rounded-4">
+        <div class="eyebrow">PHASE 7 · HISTORICAL MODEL</div>
+        <h1 class="display-6 fw-semibold mt-2">Connectivity prediction</h1>
+        <p class="text-secondary mb-0">Estimate whether poor connectivity may occur next at a location, using prior measurements from your account.</p>
+    </section>
+
+    {% if model_ready %}
+    <section class="prediction-panel mb-4">
+        <h2 class="h5">Choose one of your measured locations</h2>
+        <p class="text-secondary small">Predictions require at least one earlier measurement from the selected location. Your saved data is used only within your account for the location history query.</p>
+        <form id="predictionForm" class="row g-3 align-items-end">
+            <div class="col-md-9"><label for="predictionLocation" class="form-label">Location</label>
+                <select class="form-select" id="predictionLocation" required>
+                    <option value="">Select a location</option>
+                    {% for location in locations %}<option value="{{ location.value }}">{{ location.label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3"><button class="btn btn-primary w-100" id="predictButton" type="submit" {% if not locations %}disabled{% endif %}>Predict next status</button></div>
+        </form>
+        <div class="prediction-result d-none mt-4" id="predictionResult" aria-live="polite"></div>
+    </section>
+    {% else %}
+    <section class="prediction-panel prediction-not-ready mb-4">
+        <span class="prediction-state">Model not ready</span>
+        <h2 class="h4 mt-2">More measurements are needed before training.</h2>
+        <p class="text-secondary">The training pipeline compares two models using chronological validation and a held-out test period. It will not create a model or report an accuracy score when the data is too small or lacks both classes.</p>
+        {% if training_report %}
+        <div class="prediction-data-summary">
+            <span><strong>{{ training_report.source_rows or 0 }}</strong> total measurements</span>
+            <span><strong>{{ training_report.rows_with_valid_target_and_coordinates or 0 }}</strong> with a valid class and location</span>
+            <span><strong>{{ training_report.distinct_spatial_cells or 0 }}</strong> distinct spatial cells</span>
+        </div>
+        {% if training_report.training_reason %}<p class="alert alert-warning mt-3 mb-0">{{ training_report.training_reason }}</p>{% endif %}
+        {% endif %}
+        <div class="mt-3"><a class="btn btn-outline-primary" href="{{ url_for('connectivity_test') }}">Run a location-enabled test</a></div>
+        <p class="small text-secondary mt-3 mb-0">After collecting more measurements, run <code>python train_model.py</code> from the project folder and refresh this page.</p>
+    </section>
+    {% endif %}
+
+    {% if training_report and training_report.training_status == 'trained' %}
+    <section class="prediction-panel mb-4">
+        <h2 class="h5">Held-out model evaluation</h2>
+        <p class="small text-secondary">Metrics below are from the latest chronological test period, not training data. They describe this dataset and are not a guarantee for future locations.</p>
+        <div class="prediction-data-summary">
+            <span>Selected model <strong>{{ training_report.selected_model }}</strong></span>
+            <span>Test rows <strong>{{ training_report.test_rows }}</strong></span>
+            <span>Balanced accuracy <strong>{{ '%.3f'|format(training_report.test_metrics.balanced_accuracy) }}</strong></span>
+            <span>Precision <strong>{{ '%.3f'|format(training_report.test_metrics.precision) }}</strong></span>
+            <span>Recall <strong>{{ '%.3f'|format(training_report.test_metrics.recall) }}</strong></span>
+            <span>F1 <strong>{{ '%.3f'|format(training_report.test_metrics.f1) }}</strong></span>
+        </div>
+    </section>
+    {% endif %}
+    <p class="analytics-footnote">Predictions depend on measurement quality and coverage. The current model target is Poor (Weak or Dead Zone) versus Not poor. No probability or confidence is displayed because model probabilities have not been calibrated.</p>
+</main>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/prediction.js', v='phase7') }}"></script>{% endblock %}

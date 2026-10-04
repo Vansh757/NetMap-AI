@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="p-5 mb-4 bg-light rounded-3">
+    <div class="container-fluid py-5">
+        <h1 class="display-5 fw-bold">Welcome to NetMap AI</h1>
+        <p class="col-md-8 fs-4">Measure, score, and map your own internet connectivity results.</p>
+        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Get Started</a>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-4">
+        <h3>Score</h3>
+        <p>Compare measured download, upload, latency, and jitter with a transparent connectivity score.</p>
+    </div>
+    <div class="col-md-4">
+        <h3>Map</h3>
+        <p>Visualize your opted-in measurement locations and connectivity classifications on an interactive map.</p>
+    </div>
+    <div class="col-md-4">
+        <h3>Analyze</h3>
+        <p>Review filtered measurements, daily charts, and clusters of weak or dead-zone results.</p>
+    </div>
+</div>
+{% endblock %}

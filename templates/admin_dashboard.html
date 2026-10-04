@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block content %}
+<main id="adminDashboard" class="admin-dashboard" data-dashboard-url="{{ dashboard_url }}" data-export-url="{{ export_url }}" data-report-url="{{ report_url }}">
+    <header class="admin-hero p-4 p-lg-5 mb-4 rounded-4">
+        <div class="eyebrow">NETMAP AI · ADMINISTRATOR CONSOLE</div>
+        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-end gap-3">
+            <div><h1 class="display-6 fw-semibold mt-2 mb-2">Connectivity operations</h1><p class="text-secondary mb-0">Anonymized platform overview for project review and demonstration.</p></div>
+            <a class="btn btn-outline-primary" id="reportLink" href="{{ report_url }}">Download project report</a>
+        </div>
+    </header>
+    <section class="admin-filter-panel mb-4" aria-label="Dashboard filters">
+        <form id="adminFilters" class="row g-3 align-items-end">
+            <div class="col-6 col-lg-2"><label class="form-label" for="adminStart">From</label><input class="form-control" type="date" id="adminStart" name="start_date"></div>
+            <div class="col-6 col-lg-2"><label class="form-label" for="adminEnd">To</label><input class="form-control" type="date" id="adminEnd" name="end_date"></div>
+            <div class="col-md-4 col-lg-2"><label class="form-label" for="adminClass">Classification</label><select class="form-select" id="adminClass" name="classification"><option value="">All classes</option><option>Excellent</option><option>Good</option><option>Weak</option><option>Dead Zone</option></select></div>
+            <div class="col-md-5 col-lg-3"><label class="form-label" for="adminSearch">Search location cells</label><input class="form-control" type="search" id="adminSearch" name="search" maxlength="80" placeholder="Approx. latitude or longitude"></div>
+            <div class="col-md-3 col-lg-3 d-flex gap-2"><button class="btn btn-primary flex-grow-1" type="submit">Apply filters</button><button class="btn btn-outline-secondary" type="reset">Reset</button></div>
+        </form>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3"><small id="adminStatus" class="text-secondary" role="status" aria-live="polite">Loading aggregate statistics…</small><div class="d-flex gap-2 align-items-center"><label for="exportType" class="small text-secondary">Export</label><select id="exportType" class="form-select form-select-sm admin-export-select"><option value="daily">Daily trends</option><option value="classifications">Classification totals</option><option value="locations">Location cells</option></select><button class="btn btn-sm btn-outline-primary" id="exportButton" type="button">CSV</button></div></div>
+    </section>
+    <div id="adminError" class="alert alert-danger d-none" role="alert"></div>
+    <section class="row g-3 mb-4" aria-label="Platform statistics">
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Total users</span><strong id="admUsers">—</strong><small>Registered accounts</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Measurements</span><strong id="admMeasurements">—</strong><small>Selected filter range</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Average download</span><strong id="admDownload">—</strong><small>Mbps</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Average upload</span><strong id="admUpload">—</strong><small>Mbps</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Average latency</span><strong id="admLatency">—</strong><small>Milliseconds</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Connectivity score</span><strong id="admScore">—</strong><small>Average out of 100</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Weak measurements</span><strong id="admWeak">—</strong><small>Weak classification</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Dead-zone measurements</span><strong id="admDead">—</strong><small>Dead Zone classification</small></article></div>
+        <div class="col-6 col-xl-3"><article class="admin-stat"><span>Good location cells</span><strong id="admGoodCells">—</strong><small>At least 3 classified measurements</small></article></div>
+    </section>
+    <section class="row g-3 mb-4">
+        <div class="col-xl-8"><article class="admin-panel"><div class="admin-panel-head"><div><h2>Connectivity map</h2><p>Approximate cells with at least three measurements</p></div><div class="btn-group btn-group-sm"><button class="btn btn-primary" id="adminMarkers" type="button" aria-pressed="true">Markers</button><button class="btn btn-outline-primary" id="adminHeat" type="button" aria-pressed="false">Poor-area heatmap</button></div></div><div id="adminMap" class="admin-map" role="application" aria-label="Anonymized connectivity map"></div><p class="admin-privacy-note">Coordinates rounded to about 100 m; cells below the three-measurement threshold are suppressed.</p></article></div>
+        <div class="col-xl-4"><article class="admin-panel h-100"><div class="admin-panel-head"><div><h2>Classification distribution</h2><p>Measurements matching current filters</p></div></div><div class="chart-wrap"><canvas id="adminClassChart" aria-label="Connectivity class distribution"></canvas></div></article></div>
+        <div class="col-xl-8"><article class="admin-panel"><div class="admin-panel-head"><div><h2>Historical trend</h2><p>Daily average connectivity score and throughput</p></div></div><div class="chart-wrap"><canvas id="adminTrendChart" aria-label="Historical connectivity trend"></canvas></div></article></div>
+        <div class="col-xl-4"><article class="admin-panel"><div class="admin-panel-head"><div><h2>Location comparison</h2><p>Highest poor-measurement share in visible cells</p></div></div><div class="chart-wrap"><canvas id="adminLocationChart" aria-label="Location comparison chart"></canvas></div></article></div>
+    </section>
+    <section class="row g-3 mb-4">
+        <div class="col-lg-6"><article class="admin-panel"><div class="admin-panel-head"><div><h2>Weak locations</h2><p>Coarsened cells where at least half of classified results are poor</p></div></div><div id="weakLocations" class="admin-location-list"></div></article></div>
+        <div class="col-lg-6"><article class="admin-panel"><div class="admin-panel-head"><div><h2>Dead-zone locations</h2><p>Coarsened cells dominated by Dead Zone measurements</p></div></div><div id="deadLocations" class="admin-location-list"></div></article></div>
+    </section>
+    <section class="row g-3 mb-4">
+        <div class="col-xl-5"><article class="admin-panel h-100"><div class="admin-panel-head"><div><h2>Prediction statistics</h2><p>Model status, held-out evaluation, and anonymized served outcomes</p></div></div><div id="predictionStats" class="admin-detail-list"></div></article></div>
+        <div class="col-xl-7"><article class="admin-panel h-100"><div class="admin-panel-head"><div><h2>Recommendation summary</h2><p>Counts by detector, severity, and active/resolved status</p></div></div><div id="recommendationList" class="admin-recommendation-list"></div></article></div>
+    </section>
+    <footer class="admin-privacy-note mb-3">Administrator views exclude names, usernames, emails, passwords, account IDs, and raw measurement IDs. All displayed location data is coarsened and privacy-thresholded.</footer>
+</main>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/admin.js', v='phase9') }}"></script>{% endblock %}

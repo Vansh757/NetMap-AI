@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">User Profile</h3>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Full Name:</strong> {{ user.name }}</li>
+                    <li class="list-group-item"><strong>Username:</strong> {{ user.username }}</li>
+                    <li class="list-group-item"><strong>Email:</strong> {{ user.email }}</li>
+                </ul>
+                <div class="mt-4 text-center">
+                    <a href="{{ url_for("dashboard") }}" class="btn btn-primary">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

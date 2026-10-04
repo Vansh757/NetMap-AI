@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="diagnostic-hero p-4 p-md-5 mb-4 rounded-4">
+    <div class="eyebrow">NETWORK DIAGNOSTICS</div>
+    <h1 class="display-6 fw-semibold mt-2">Welcome back, {{ name }}.</h1>
+    <p class="lead text-secondary mb-4">Measure your connection and review your previous results.</p>
+    <a href="{{ url_for('connectivity_test') }}" class="btn btn-primary btn-lg">Run Internet Test</a>
+</section>
+<section class="recommendation-section mb-4" aria-labelledby="recommendationHeading">
+    <div class="d-flex justify-content-between align-items-end gap-2 mb-3">
+        <div><div class="eyebrow">BASED ON YOUR MEASUREMENTS</div><h2 class="h4 mb-0 mt-1" id="recommendationHeading">Connectivity recommendations</h2></div>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('recommendation_history') }}">View history</a>
+    </div>
+    {% if recommendations %}
+    <div class="recommendation-list">
+        {% for item in recommendations %}
+        <article class="recommendation-card severity-{{ item.severity|lower }}">
+            <div class="recommendation-card-heading"><span class="recommendation-severity">{{ item.severity }}</span><small>Updated {{ item.last_seen }}</small></div>
+            <h3>{{ item.title }}</h3><p class="recommendation-problem">{{ item.problem }}</p>
+            <p class="recommendation-action"><strong>Suggested action:</strong> {{ item.recommendation }}</p>
+            <p class="recommendation-reason"><strong>Reason:</strong> {{ item.reason }}</p>
+            <div class="recommendation-evidence"><strong>Supporting measurements:</strong>
+                {% for measurement in item.supporting_measurements %}<a href="{{ measurement.url }}">#{{ measurement.id }}</a>{% endfor %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="recommendation-empty">No patterns requiring a recommendation were found in your recent measurements. This does not guarantee that connectivity is always good.</div>
+    {% endif %}
+</section>
+<div class="row g-4">
+    <div class="col-md-4">
+        <a class="diagnostic-link-card" href="{{ url_for('connectivity_test') }}">
+            <span class="diagnostic-icon">TEST</span>
+            <span><strong>Run a new test</strong><small>Check speed and browser HTTP latency.</small></span>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a class="diagnostic-link-card" href="{{ url_for('measurement_history') }}">
+            <span class="diagnostic-icon">LOG</span>
+            <span><strong>Measurement history</strong><small>Review or remove your saved results.</small></span>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a class="diagnostic-link-card" href="{{ url_for('measurement_map') }}">
+            <span class="diagnostic-icon">MAP</span>
+            <span><strong>Connectivity map</strong><small>Explore your location-enabled results.</small></span>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a class="diagnostic-link-card" href="{{ url_for('analytics_dashboard') }}">
+            <span class="diagnostic-icon">DATA</span>
+            <span><strong>Advanced analytics</strong><small>Explore trends and compare your locations.</small></span>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a class="diagnostic-link-card" href="{{ url_for('prediction_dashboard') }}">
+            <span class="diagnostic-icon">AI</span>
+            <span><strong>Connectivity prediction</strong><small>Review history-based outlooks for saved locations.</small></span>
+        </a>
+    </div>
+</div>
+{% endblock %}
