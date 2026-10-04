@@ -31,6 +31,7 @@ app.config.update(
     MYSQL_USER=os.environ.get("MYSQL_USER", "root"),
     MYSQL_PASSWORD=os.environ.get("MYSQL_PASSWORD", ""),
     MYSQL_DB=os.environ.get("MYSQL_DB", "netmap_db"),
+    MYSQL_PORT=int(os.environ.get("MYSQL_PORT", "3306")),
     MYSQL_CURSORCLASS="DictCursor",
     MAX_CONTENT_LENGTH=4 * 1024 * 1024,
 )
