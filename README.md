@@ -56,3 +56,7 @@ Static review found parameterized SQL for user-controlled query values, password
 ## Research integrity
 
 Do not report model accuracy unless a current training report exists and its held-out metrics are shown. Do not describe a recommendation as proof of a physical cause. The implementation's innovation is its combination of application-server measurement, permission-based mapping, analytics, an optional history-based classifier, and evidence-linked recommendations—not a claim that no similar system exists.
+
+Author 
+
+Vansh Patel
