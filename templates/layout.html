@@ -25,6 +25,14 @@
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
                         {% if session.role == 'admin' %}
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin</a></li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin_feedback') }}">
+                                    Feedback
+                                    {% if unread_feedback_count and unread_feedback_count > 0 %}
+                                        <span class="badge bg-danger rounded-pill ms-1">{{ unread_feedback_count }}</span>
+                                    {% endif %}
+                                </a>
+                            </li>
                         {% else %}
                             <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_login') }}">Admin Login</a></li>
                         {% endif %}

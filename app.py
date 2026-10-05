@@ -173,6 +173,20 @@ def internal_server_error(error):
     return render_template("500.html"), 500
 
 
+@app.context_processor
+def inject_admin_feedback_count():
+    if session.get("role") == "admin":
+        try:
+            cursor = mysql.connection.cursor()
+            cursor.execute("SELECT COUNT(*) AS total FROM contact_messages WHERE status = 'unread'")
+            row = cursor.fetchone()
+            cursor.close()
+            return {"unread_feedback_count": int(row["total"] if row else 0)}
+        except Exception:
+            return {"unread_feedback_count": 0}
+    return {"unread_feedback_count": 0}
+
+
 @app.after_request
 def set_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
@@ -209,9 +223,68 @@ def about():
     return render_template("about.html")
 
 
-@app.route("/contact")
+@app.route("/contact", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def contact():
-    return render_template("contact.html")
+    values = {"name": "", "email": "", "subject": "", "message": ""}
+    # Pre-fill name and email if user is logged in
+    if session.get("user_id"):
+        values["name"] = session.get("name", "")
+        cursor = mysql.connection.cursor()
+        try:
+            cursor.execute("SELECT email, name FROM users WHERE id = %s LIMIT 1", (session["user_id"],))
+            user = cursor.fetchone()
+            if user:
+                values["name"] = user.get("name") or values["name"]
+                values["email"] = user.get("email") or ""
+        finally:
+            cursor.close()
+
+    if request.method == "POST":
+        values["name"] = request.form.get("name", "").strip()
+        values["email"] = request.form.get("email", "").strip().lower()
+        values["subject"] = request.form.get("subject", "").strip()
+        values["message"] = request.form.get("message", "").strip()
+
+        errors = []
+        if not values["name"] or len(values["name"]) > 100:
+            errors.append("Please enter your name (up to 100 characters).")
+        if not values["email"] or len(values["email"]) > 254 or not EMAIL_RE.match(values["email"]):
+            errors.append("Please enter a valid email address.")
+        if not values["subject"] or len(values["subject"]) > 150:
+            errors.append("Please enter a subject (up to 150 characters).")
+        if not values["message"] or len(values["message"]) > 3000:
+            errors.append("Please enter a message (up to 3,000 characters).")
+
+        if errors:
+            for error in errors:
+                flash(error, "danger")
+            return render_template("contact.html", values=values)
+
+        cursor = mysql.connection.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO contact_messages (user_id, name, email, subject, message, status) "
+                "VALUES (%s, %s, %s, %s, %s, 'unread')",
+                (
+                    session.get("user_id"),
+                    values["name"],
+                    values["email"],
+                    values["subject"],
+                    values["message"],
+                ),
+            )
+            mysql.connection.commit()
+        except Exception:
+            mysql.connection.rollback()
+            raise
+        finally:
+            cursor.close()
+
+        flash("Thank you for your feedback! Your message has been received.", "success")
+        return redirect(url_for("contact"))
+
+    return render_template("contact.html", values=values)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -802,6 +875,94 @@ def admin_project_report():
     response.headers["Content-Disposition"] = "attachment; filename=netmap-project-report.txt"
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@app.route("/admin/feedback")
+@admin_required
+def admin_feedback():
+    current_status = request.args.get("status", "all").strip().lower()
+    if current_status not in ("all", "unread", "read"):
+        current_status = "all"
+
+    cursor = mysql.connection.cursor()
+    try:
+        cursor.execute("SELECT status, COUNT(*) AS total FROM contact_messages GROUP BY status")
+        counts = {row["status"]: int(row["total"]) for row in cursor.fetchall()}
+        count_unread = counts.get("unread", 0)
+        count_read = counts.get("read", 0)
+        count_all = count_unread + count_read
+
+        if current_status == "all":
+            cursor.execute(
+                "SELECT id, user_id, name, email, subject, message, status, created_at "
+                "FROM contact_messages ORDER BY created_at DESC LIMIT 200"
+            )
+        else:
+            cursor.execute(
+                "SELECT id, user_id, name, email, subject, message, status, created_at "
+                "FROM contact_messages WHERE status = %s ORDER BY created_at DESC LIMIT 200",
+                (current_status,),
+            )
+        messages = cursor.fetchall()
+    finally:
+        cursor.close()
+
+    return render_template(
+        "admin_feedback.html",
+        messages=messages,
+        current_status=current_status,
+        count_all=count_all,
+        count_unread=count_unread,
+        count_read=count_read,
+    )
+
+
+@app.route("/admin/feedback/<int:message_id>/status", methods=["POST"])
+@admin_required
+def admin_feedback_status(message_id):
+    new_status = request.form.get("status", "").strip().lower()
+    if new_status not in ("read", "unread"):
+        flash("Invalid status specified.", "danger")
+        return redirect(request.referrer or url_for("admin_feedback"))
+
+    cursor = mysql.connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE contact_messages SET status = %s WHERE id = %s",
+            (new_status, message_id),
+        )
+        mysql.connection.commit()
+        if cursor.rowcount:
+            flash(f"Message #{message_id} marked as {new_status}.", "success")
+        else:
+            flash(f"Message #{message_id} was not found.", "warning")
+    except Exception:
+        mysql.connection.rollback()
+        raise
+    finally:
+        cursor.close()
+
+    return redirect(request.referrer or url_for("admin_feedback"))
+
+
+@app.route("/admin/feedback/<int:message_id>/delete", methods=["POST"])
+@admin_required
+def admin_feedback_delete(message_id):
+    cursor = mysql.connection.cursor()
+    try:
+        cursor.execute("DELETE FROM contact_messages WHERE id = %s", (message_id,))
+        mysql.connection.commit()
+        if cursor.rowcount:
+            flash(f"Message #{message_id} has been deleted.", "success")
+        else:
+            flash(f"Message #{message_id} was not found.", "warning")
+    except Exception:
+        mysql.connection.rollback()
+        raise
+    finally:
+        cursor.close()
+
+    return redirect(request.referrer or url_for("admin_feedback"))
 
 
 @app.route("/api/measurements/map")

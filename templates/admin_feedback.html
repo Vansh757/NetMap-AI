@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+{% block content %}
+<main class="admin-feedback-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <div class="eyebrow">ADMINISTRATOR CONSOLE</div>
+            <h1 class="display-6 fw-semibold mb-1">User Feedback & Contact Inquiries</h1>
+            <p class="text-secondary mb-0">Review submitted messages, suggestions, and support requests.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 p-3 bg-light rounded-3">
+        <div class="btn-group" role="group" aria-label="Filter by status">
+            <a href="{{ url_for('admin_feedback', status='all') }}"
+               class="btn btn-sm {% if current_status == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                All Messages <span class="badge bg-light text-dark ms-1">{{ count_all }}</span>
+            </a>
+            <a href="{{ url_for('admin_feedback', status='unread') }}"
+               class="btn btn-sm {% if current_status == 'unread' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Unread <span class="badge bg-danger ms-1">{{ count_unread }}</span>
+            </a>
+            <a href="{{ url_for('admin_feedback', status='read') }}"
+               class="btn btn-sm {% if current_status == 'read' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                Read <span class="badge bg-secondary ms-1">{{ count_read }}</span>
+            </a>
+        </div>
+        <small class="text-secondary">Showing {{ messages|length }} message(s)</small>
+    </div>
+
+    {% if messages %}
+    <div class="table-responsive shadow-sm rounded-3">
+        <table class="table table-hover align-middle mb-0 bg-white">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col" style="width: 60px;">ID</th>
+                    <th scope="col" style="width: 100px;">Status</th>
+                    <th scope="col" style="width: 180px;">Sender</th>
+                    <th scope="col" style="width: 200px;">Subject</th>
+                    <th scope="col">Message</th>
+                    <th scope="col" style="width: 160px;">Date & Time</th>
+                    <th scope="col" style="width: 180px;" class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for msg in messages %}
+                <tr class="{% if msg.status == 'unread' %}table-warning-subtle{% endif %}">
+                    <td>#{{ msg.id }}</td>
+                    <td>
+                        {% if msg.status == 'unread' %}
+                        <span class="badge bg-warning text-dark px-2 py-1">Unread</span>
+                        {% else %}
+                        <span class="badge bg-secondary px-2 py-1">Read</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="fw-semibold">{{ msg.name }}</div>
+                        <a href="mailto:{{ msg.email }}" class="small text-muted text-decoration-none">{{ msg.email }}</a>
+                        {% if msg.user_id %}
+                        <div class="badge bg-light text-secondary border mt-1">User #{{ msg.user_id }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="fw-medium">{{ msg.subject }}</td>
+                    <td>
+                        <div class="text-break" style="max-height: 80px; overflow-y: auto;">
+                            {{ msg.message }}
+                        </div>
+                    </td>
+                    <td class="small text-secondary">
+                        {{ msg.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    </td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-1">
+                            <!-- Toggle Read/Unread Form -->
+                            <form action="{{ url_for('admin_feedback_status', message_id=msg.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                {% if msg.status == 'unread' %}
+                                <input type="hidden" name="status" value="read">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Mark as Read">
+                                    Mark Read
+                                </button>
+                                {% else %}
+                                <input type="hidden" name="status" value="unread">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Mark as Unread">
+                                    Mark Unread
+                                </button>
+                                {% endif %}
+                            </form>
+
+                            <!-- Delete Form -->
+                            <form action="{{ url_for('admin_feedback_delete', message_id=msg.id) }}" method="post" class="d-inline"
+                                  onsubmit="return confirm('Are you sure you want to permanently delete message #{{ msg.id }}?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete message">
+                                    Delete
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 bg-white rounded-3 shadow-sm">
+        <h4 class="text-muted mb-2">No messages found</h4>
+        <p class="text-secondary mb-0">There are no feedback submissions in this category.</p>
+    </div>
+    {% endif %}
+</main>
+{% endblock %}

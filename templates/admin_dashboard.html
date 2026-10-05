@@ -44,6 +44,22 @@
         <div class="col-xl-5"><article class="admin-panel h-100"><div class="admin-panel-head"><div><h2>Prediction statistics</h2><p>Model status, held-out evaluation, and anonymized served outcomes</p></div></div><div id="predictionStats" class="admin-detail-list"></div></article></div>
         <div class="col-xl-7"><article class="admin-panel h-100"><div class="admin-panel-head"><div><h2>Recommendation summary</h2><p>Counts by detector, severity, and active/resolved status</p></div></div><div id="recommendationList" class="admin-recommendation-list"></div></article></div>
     </section>
+    <section class="admin-panel p-4 mb-4 rounded-3 border bg-white shadow-sm">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h2 class="h5 mb-1 fw-semibold">User Contact & Feedback</h2>
+                <p class="text-secondary mb-0">Review incoming user messages, suggestions, and support inquiries.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ url_for('admin_feedback') }}" class="btn btn-primary px-3">
+                    View Feedback Console
+                    {% if unread_feedback_count and unread_feedback_count > 0 %}
+                    <span class="badge bg-danger ms-1">{{ unread_feedback_count }} unread</span>
+                    {% endif %}
+                </a>
+            </div>
+        </div>
+    </section>
     <footer class="admin-privacy-note mb-3">Administrator views exclude names, usernames, emails, passwords, account IDs, and raw measurement IDs. All displayed location data is coarsened and privacy-thresholded.</footer>
 </main>
 {% endblock %}
