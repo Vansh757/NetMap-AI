@@ -15,6 +15,9 @@ import MySQLdb.cursors
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from flask_mysqldb import MySQL
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 from scoring import calculate_connectivity_score
 from recommendation_engine import refresh_recommendations, serialize_recommendation
@@ -27,6 +30,10 @@ app.config.update(
     SECRET_KEY=os.environ.get("SECRET_KEY"),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    # Set SESSION_COOKIE_SECURE=1 in production (HTTPS). Leave unset or 0 for local HTTP dev.
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "0") == "1",
+    # Sessions expire after 8 hours of inactivity (requires session.permanent = True per login).
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     MYSQL_HOST=os.environ.get("MYSQL_HOST", "localhost"),
     MYSQL_USER=os.environ.get("MYSQL_USER", "root"),
     MYSQL_PASSWORD=os.environ.get("MYSQL_PASSWORD", ""),
@@ -37,6 +44,17 @@ app.config.update(
 )
 
 mysql = MySQL(app)
+csrf = CSRFProtect(app)
+# Increase token validity to match session lifetime so long-open tabs don't fail.
+app.config["WTF_CSRF_TIME_LIMIT"] = 8 * 3600  # 8 hours
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
 ML_MODEL_PATH = Path(__file__).resolve().parent / "artifacts" / "phase7_connectivity.joblib"
 ML_REPORT_PATH = Path(__file__).resolve().parent / "artifacts" / "phase7_eda_report.json"
 
@@ -113,11 +131,72 @@ def api_admin_required(view):
     return wrapped_view
 
 
-def safe_return_url(target):
+def safe_return_url(target, default="dashboard"):
     # Only allow local paths so a crafted next parameter cannot redirect away.
     if target and target.startswith("/") and not target.startswith("//"):
         return target
-    return url_for("dashboard")
+    return url_for(default)
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error):
+    if request.path.startswith("/api/") or request.is_json:
+        return jsonify(error=f"CSRF authentication failed: {error.description}"), 400
+    flash("Session security token expired or is invalid. Please try again.", "warning")
+    return redirect(request.referrer or url_for("home"))
+
+
+@app.errorhandler(429)
+def handle_ratelimit_error(error):
+    if request.path.startswith("/api/") or request.is_json:
+        return jsonify(error=f"Too many requests: {error.description}"), 429
+    flash("Too many attempts. Please wait a minute before trying again.", "danger")
+    return redirect(request.referrer or url_for("home"))
+
+
+@app.errorhandler(404)
+def not_found_error(error):
+    if request.path.startswith("/api/") or request.is_json:
+        return jsonify(error="Resource not found."), 404
+    return render_template("404.html"), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    try:
+        mysql.connection.rollback()
+    except Exception:
+        pass
+    app.logger.exception("Internal server error: %s", error)
+    if request.path.startswith("/api/") or request.is_json:
+        return jsonify(error="An internal server error occurred."), 500
+    return render_template("500.html"), 500
+
+
+@app.after_request
+def set_security_headers(response):
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(self)"
+
+    # Content Security Policy accommodating CDNs used by the application (Bootstrap, Leaflet, Chart.js, OSM)
+    csp_directives = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+        "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://unpkg.com",
+        "font-src 'self' https://cdn.jsdelivr.net",
+        "connect-src 'self'",
+        "frame-ancestors 'none'",
+    ]
+    response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
+
+    # In production HTTPS, enforce HSTS
+    if app.config.get("SESSION_COOKIE_SECURE") or request.is_secure:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    return response
 
 
 @app.route("/")
@@ -136,6 +215,7 @@ def contact():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if session.get("user_id"):
         return redirect(url_for("admin_dashboard" if session.get("role") == "admin" else "dashboard"))
@@ -160,16 +240,14 @@ def login():
 
         if user and check_password_hash(user["password"], password):
             session.clear()
+            session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["name"] = user["name"]
             session["role"] = user["role"]
             flash("You are now logged in.", "success")
-            fallback = url_for("admin_dashboard") if user["role"] == "admin" else url_for("dashboard")
-            target = safe_return_url(request.args.get("next"))
-            if target == url_for("dashboard"):
-                target = fallback
-            return redirect(target)
+            default_target = "admin_dashboard" if user["role"] == "admin" else "dashboard"
+            return redirect(safe_return_url(request.args.get("next"), default=default_target))
 
         flash("Invalid username or password.", "danger")
         return render_template("login.html", username=username)
@@ -178,6 +256,7 @@ def login():
 
 
 @app.route("/admin/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def admin_login():
     if session.get("user_id") and session.get("role") == "admin":
         return redirect(url_for("admin_dashboard"))
@@ -198,19 +277,20 @@ def admin_login():
             cursor.close()
         if user and user["role"] == "admin" and check_password_hash(user["password"], password):
             session.clear()
+            session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["name"] = user["name"]
             session["role"] = "admin"
             flash("Administrator sign-in successful.", "success")
-            next_target = request.args.get("next")
-            return redirect(safe_return_url(next_target) if next_target else url_for("admin_dashboard"))
+            return redirect(safe_return_url(request.args.get("next"), default="admin_dashboard"))
         flash("Invalid administrator credentials.", "danger")
         return render_template("admin_login.html", username=username)
     return render_template("admin_login.html", username="")
 
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
 def register():
     if session.get("user_id"):
         return redirect(url_for("dashboard"))
@@ -1160,6 +1240,7 @@ def connectivity_download():
 
 
 @app.route("/api/connectivity/upload", methods=["POST"])
+@csrf.exempt
 @api_login_required
 def connectivity_upload():
     if request.mimetype != "application/octet-stream":
@@ -1290,7 +1371,6 @@ def save_measurement():
 
     return jsonify(
         id=measurement_id,
-        user_id=session["user_id"],
         created_at=saved["created_at"].isoformat(sep=" ", timespec="seconds"),
         packet_loss_percent=None,
         latitude=latitude,

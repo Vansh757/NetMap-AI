@@ -6,6 +6,7 @@
         <h1 class="h2 mt-2">Administrator sign in</h1>
         <p class="text-secondary">Use an existing account that has been granted the administrator role.</p>
         <form method="post" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3"><label for="username" class="form-label">Username</label><input class="form-control" id="username" name="username" value="{{ username }}" maxlength="50" autocomplete="username" required></div>
             <div class="mb-3"><label for="password" class="form-label">Password</label><input class="form-control" id="password" name="password" type="password" maxlength="128" autocomplete="current-password" required></div>
             <button class="btn btn-primary w-100" type="submit">Sign in to admin dashboard</button>

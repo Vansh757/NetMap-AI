@@ -64,6 +64,26 @@ def measurement_where(filters, include_location_search=False):
     return " AND ".join(clauses), params
 
 
+def recommendation_where(filters):
+    clauses = ["1 = 1"]
+    params = []
+    if filters["start"]:
+        clauses.append("last_seen >= %s")
+        params.append(f"{filters['start'].isoformat()} 00:00:00")
+    if filters["end"]:
+        clauses.append("first_seen < %s")
+        params.append(f"{(filters['end'] + timedelta(days=1)).isoformat()} 00:00:00")
+    if filters["search"]:
+        literal_search = filters["search"].replace("!", "!!").replace("%", "!%").replace("_", "!_")
+        clauses.append(
+            "(title LIKE %s ESCAPE '!' OR kind LIKE %s ESCAPE '!' "
+            "OR CAST(ROUND(latitude, 3) AS CHAR) LIKE %s ESCAPE '!' "
+            "OR CAST(ROUND(longitude, 3) AS CHAR) LIKE %s ESCAPE '!')"
+        )
+        params.extend([f"%{literal_search}%", f"%{literal_search}%", f"%{literal_search}%", f"%{literal_search}%"])
+    return " AND ".join(clauses), params
+
+
 def query_dashboard(cursor, filters, model_report=None):
     where, params = measurement_where(filters)
     cursor.execute("SELECT COUNT(*) AS total_users FROM users")
@@ -144,10 +164,13 @@ def query_dashboard(cursor, filters, model_report=None):
         "FROM connectivity_prediction_events"
     )
     prediction_summary = cursor.fetchone()
+    rec_where, rec_params = recommendation_where(filters)
     cursor.execute(
         "SELECT kind, title, recommendation_text, severity, status, COUNT(*) AS total, MAX(last_seen) AS last_seen "
-        "FROM connectivity_recommendations GROUP BY kind, title, recommendation_text, severity, status "
-        "ORDER BY FIELD(severity, 'Critical', 'Attention', 'Information'), total DESC LIMIT 50"
+        "FROM connectivity_recommendations WHERE " + rec_where + " "
+        "GROUP BY kind, title, recommendation_text, severity, status "
+        "ORDER BY FIELD(severity, 'Critical', 'Attention', 'Information'), total DESC LIMIT 50",
+        tuple(rec_params),
     )
     recommendation_groups = cursor.fetchall()
 

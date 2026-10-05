@@ -13,9 +13,12 @@
         result.className = 'prediction-result mt-4';
         result.textContent = 'Checking prior measurements for this location…';
         try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+            if (csrfToken) headers['X-CSRFToken'] = csrfToken;
             const response = await fetch(root.dataset.apiUrl, {
                 method: 'POST', credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers,
                 body: JSON.stringify({ latitude, longitude })
             });
             const data = await response.json();

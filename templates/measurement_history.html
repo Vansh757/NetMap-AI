@@ -23,6 +23,7 @@
         <div class="history-metric"><small>Classification</small><strong>{% if measurement.connectivity_classification %}<span class="classification-badge {{ measurement.connectivity_classification|lower|replace(' ', '-') }}">{{ measurement.connectivity_classification }}</span>{% else %}Pending{% endif %}</strong></div>
         <div class="history-metric"><small>Packet loss</small><strong>Unavailable</strong></div>
         <form action="{{ url_for('delete_measurement', measurement_id=measurement.id) }}" method="post" onsubmit="return confirm('Delete this measurement?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
         </form>
     </article>

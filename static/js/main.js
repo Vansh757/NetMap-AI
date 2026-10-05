@@ -160,6 +160,10 @@ if (clearLocationButton) {
         return (received * 8) / elapsedSeconds / 1_000_000;
     }
 
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
     function measureUpload() {
         const byteCount = 1 * mib;
         const payload = new Uint8Array(byteCount);
@@ -172,8 +176,10 @@ if (clearLocationButton) {
             const started = performance.now();
          
             xhr.open('POST', app.dataset.uploadUrl);
-xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-xhr.timeout = 20000;
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+            const csrfToken = getCsrfToken();
+            if (csrfToken) xhr.setRequestHeader('X-CSRFToken', csrfToken);
+            xhr.timeout = 20000;
             xhr.upload.addEventListener('progress', event => {
                 if (event.lengthComputable) {
                     setProgress(60 + 22 * Math.min(event.loaded / event.total, 1), 'Measuring upload speed...');
@@ -264,10 +270,13 @@ xhr.timeout = 20000;
             const browserNetwork = browserNetworkInfo();
 
             setProgress(88, 'Saving your measurement...');
+            const csrfToken = getCsrfToken();
+            const headers = { 'Content-Type': 'application/json' };
+            if (csrfToken) headers['X-CSRFToken'] = csrfToken;
             const response = await fetch(app.dataset.saveUrl, {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     download_mbps: download,
                     upload_mbps: upload,
@@ -289,7 +298,6 @@ xhr.timeout = 20000;
             renderNetworkInfo(browserNetwork);
             document.getElementById('result-timestamp').textContent = `${saved.created_at} (server time)`;
             document.getElementById('result-id').textContent = saved.id;
-            document.getElementById('result-user-id').textContent = saved.user_id;
            const score = Number(saved.connectivity_score);
 document.getElementById('result-score').textContent =
     Number.isFinite(score) ? `${score.toFixed(1)} / 100` : 'Unavailable';
